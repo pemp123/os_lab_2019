@@ -1,0 +1,4 @@
+mv tests/tests.c revert_string/tests.c
+gcc -c -fPIC tests.c -o bin/tests.o
+gcc bin/tests.o -Lbin/shared -lrevsh -o bin/dyn-tests -lcunit
+LD_LIBRARY_PATH=$(pwd)/bin/shared bin/dyn-tests
