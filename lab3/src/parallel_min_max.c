@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include <sys/time.h>
 #include <sys/types.h>
@@ -15,10 +16,20 @@
 #include "find_min_max.h"
 #include "utils.h"
 
+volatile pid_t* child_processes_array;
+volatile int child_processes_number;
+
+static void alarmHandler(int signal) {
+  for (int i = 0; i < child_processes_number; i++) {
+    kill(child_processes_array[i], SIGKILL);
+  }
+}
+
 int main(int argc, char **argv) {
   int seed = -1;
   int array_size = -1;
   int pnum = -1;
+  int timeout = -1;
   bool with_files = false;
 
   while (true) {
@@ -28,6 +39,7 @@ int main(int argc, char **argv) {
                                       {"array_size", required_argument, 0, 0},
                                       {"pnum", required_argument, 0, 0},
                                       {"by_files", no_argument, 0, 'f'},
+                                      {"timeout", required_argument, 0, 0},
                                       {0, 0, 0, 0}};
 
     int option_index = 0;
@@ -49,6 +61,9 @@ int main(int argc, char **argv) {
             break;
           case 3:
             with_files = true;
+            break;
+          case 4:
+            timeout = atoi(optarg);
             break;
 
           default:
@@ -82,6 +97,12 @@ int main(int argc, char **argv) {
   GenerateArray(array, array_size, seed);
   int active_child_processes = 0;
   int active_array_step = pnum < array_size ? (array_size / pnum) : 1;
+
+    if (timeout != - 1) {
+    printf("\nSET TIMEOUT.\n");
+    alarm(timeout);
+    signal(SIGALRM, alarmHandler);
+  }
 
   struct timeval start_time;
   gettimeofday(&start_time, NULL);

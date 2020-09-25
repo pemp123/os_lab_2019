@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-I. -Wall
+CFLAGS=-I. -Wall -std=c99
 
 all: sequential_min_max parallel_min_max ex5_sequential
 
