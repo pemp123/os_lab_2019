@@ -6,32 +6,25 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
-
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
 #include <getopt.h>
-
 #include "find_min_max.h"
 #include "utils.h"
+void alarm_handler(int);
+void child_handler(int);
 
-volatile pid_t* child_processes_array;
-volatile int child_processes_number;
-
-static void alarmHandler(int signal) {
-  for (int i = 0; i < child_processes_number; i++) {
-    kill(child_processes_array[i], SIGKILL);
-  }
-}
+int is_timeout = 0;
+int child_done = 0;
 
 int main(int argc, char **argv) {
   int seed = -1;
   int array_size = -1;
   int pnum = -1;
-  int timeout = -1;
   bool with_files = false;
-
+  int timeout = -1;
   while (true) {
     int current_optind = optind ? optind : 1;
 
@@ -39,7 +32,7 @@ int main(int argc, char **argv) {
                                       {"array_size", required_argument, 0, 0},
                                       {"pnum", required_argument, 0, 0},
                                       {"by_files", no_argument, 0, 'f'},
-                                      {"timeout", required_argument, 0, 0},
+                                      {"timeout", required_argument,0,0},
                                       {0, 0, 0, 0}};
 
     int option_index = 0;
@@ -51,13 +44,29 @@ int main(int argc, char **argv) {
       case 0:
         switch (option_index) {
           case 0:
-            seed = atoi(optarg);       
+            seed = atoi(optarg);
+            if(seed<=0)
+            {
+              printf("seed is a positive number\n");
+              return 1;
+            }
+
             break;
           case 1:
             array_size = atoi(optarg);
+            if (array_size<=0)
+            {
+              printf("array_size is a positive number\n");
+              return 1;
+            }
             break;
           case 2:
-            pnum = atoi(optarg);
+              pnum = atoi(optarg);
+             if(pnum<=0)
+            {
+              printf("pnum is a positive number\n");
+              return 1;
+            }
             break;
           case 3:
             with_files = true;
@@ -68,8 +77,9 @@ int main(int argc, char **argv) {
 
           default:
             printf("Index %d is out of options\n", option_index);
+
         }
-        break;
+	break;
       case 'f':
         with_files = true;
         break;
@@ -93,73 +103,96 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  int *array = malloc(sizeof(int) * array_size);
+  int *array = (int*)malloc(sizeof(int) * array_size);
   GenerateArray(array, array_size, seed);
   int active_child_processes = 0;
-  int active_array_step = pnum < array_size ? (array_size / pnum) : 1;
-
-  if (timeout != - 1) {
-    printf("\nSET TIMEOUT.\n");
-    alarm(timeout);
-    signal(SIGALRM, alarmHandler);
-  }
 
   struct timeval start_time;
   gettimeofday(&start_time, NULL);
-  int pipefd[2];
-  if (with_files) {
-    FILE *shared_file;
-    shared_file = fopen("lab3.txt", "w+");
-    fprintf(shared_file, "");
-    fclose(shared_file);
-  } else {
-    if (pipe(pipefd) == -1) {
-      perror("\nERROR CREATE PIPE!\n");
-      exit(EXIT_FAILURE);
-    }
-  }
-  child_processes_array = (pid_t*)malloc(pnum * sizeof(pid_t));
-  child_processes_number = 0;
 
+  int step=array_size/pnum;
+
+ FILE* fl;
+ int** pipefd;
+  if (with_files) {
+      fl=fopen("test.txt","w");
+    }
+     else {
+       pipefd=(int**)malloc(sizeof(int*) * pnum);
+    }
+
+
+  pid_t pid;
   for (int i = 0; i < pnum; i++) {
-    pid_t child_pid = fork();
-    if (child_pid >= 0) {
-      // successful fork
+    if (!with_files){
+         pipefd[i]=(int*)malloc(sizeof(int)*2);
+           if (pipe(pipefd[i])==-1) {
+            printf("Pipe Failed");
+            return 1;
+          }
+        }
+    pid = fork();
+    if (pid >= 0) {
+                  // successful fork
       active_child_processes += 1;
-      if (child_pid == 0) {
-        unsigned int start = active_array_step * (active_child_processes - 1);
-        unsigned int end = start + active_array_step;
-        start = start > array_size ? array_size : start;
-        end = end > array_size ? array_size : end;
-        if (active_child_processes == pnum)
-          end = array_size;
-        struct MinMax min_max = GetMinMax(array, start, end);
+      if (pid == 0) {
+        printf("Pipe was created\n");
+
+        struct  MinMax min_max_i;
+        // child process
+        if (i!=pnum-1){
+          min_max_i=GetMinMax(array,i*step,(i+1)*step) ;
+        }
+        else{
+          min_max_i=GetMinMax(array,i*step,array_size) ;
+        }     // prallel somehow
+
         if (with_files) {
-          FILE *shared_file;
-          shared_file = fopen("lab3.txt", "a+");
-          fwrite(&min_max, sizeof(struct MinMax), 1, shared_file);
-          fclose(shared_file);
+          fwrite(&min_max_i.min,sizeof(int),1,fl);
+          fwrite(&min_max_i.max,sizeof(int),1,fl);
         } else {
-          close(pipefd[0]);
-          write(pipefd[1], &min_max, sizeof(struct MinMax));
-          close(pipefd[1]);
+
+          write(pipefd[i][1],&min_max_i.min,sizeof(int));
+          write(pipefd[i][1],&min_max_i.max,sizeof(int));
+
+          close(pipefd[i][1]);
         }
         return 0;
       }
+
     } else {
       printf("Fork failed!\n");
       return 1;
     }
   }
-
-  while (active_child_processes > 0) {
-    int status = -1;
-    waitpid(-1, &status, WNOHANG);
-    active_child_processes -= 1;
+  signal(SIGALRM, alarm_handler);
+  signal(SIGCHLD, child_handler);
+  alarm(timeout);
+  pause();
+    if (is_timeout) {
+        printf("alarm triggered\n");
+        int result = waitpid(pid, NULL, WNOHANG);
+        if (result == 0) {
+            printf("killing child\n");
+            kill(pid, 9);
+            wait(NULL);
+        } else {
+            printf("alarm triggered, but child finished normally\n");
+        }
+    } else if (child_done) {
+        printf("child finished normally\n");
+        wait(NULL);
+    }
+  if(with_files)
+  {fclose(fl);
+  fl=fopen("test.txt","r");
   }
 
-  FILE *shared_file;
-  shared_file = fopen("lab3.txt", "r");
+  while (active_child_processes > 0) {
+    wait(NULL);
+
+    active_child_processes -= 1;
+  }
 
   struct MinMax min_max;
   min_max.min = INT_MAX;
@@ -168,27 +201,35 @@ int main(int argc, char **argv) {
   for (int i = 0; i < pnum; i++) {
     int min = INT_MAX;
     int max = INT_MIN;
-    struct MinMax tmp_min_max;
 
-    // :)
-    if (with_files) {
-      fread(&tmp_min_max, sizeof(struct MinMax), 1, shared_file);
-      if (i == pnum - 1) 
-        fclose(shared_file);
+    if (with_files) {     // read from files
+
+
+      fread(&min,sizeof(int),1,fl);
+      fread(&max,sizeof(int),1,fl);
+
     } else {
-      close(pipefd[1]);
-      read(pipefd[0], &tmp_min_max, sizeof(struct MinMax));
-      close(pipefd[0]);
+      //close(pipefd[i][1]);
+
+      read(pipefd[i][0],&min,sizeof(int));
+      read(pipefd[i][0],&max,sizeof(int));
+
+      close(pipefd[i][0]);
+
+      free(pipefd[i]) ;
     }
-    min = tmp_min_max.min;
-    max = tmp_min_max.max;
 
 
-    if (min < min_max.min) 
-      min_max.min = min;
-    if (max > min_max.max) 
-      min_max.max = max;
+    if (min < min_max.min) min_max.min = min;
+    if (max > min_max.max) min_max.max = max;
   }
+
+  if (with_files) {
+      fclose(fl);
+    }
+     else {
+      free(pipefd);
+    }
 
   struct timeval finish_time;
   gettimeofday(&finish_time, NULL);
@@ -198,9 +239,18 @@ int main(int argc, char **argv) {
 
   free(array);
 
-  printf("\nMin: %d\n", min_max.min);
+  printf("Min: %d\n", min_max.min);
   printf("Max: %d\n", min_max.max);
-  printf("Elapsed time: %fms\n\n", elapsed_time);
+  printf("Elapsed time: %fms\n", elapsed_time);
   fflush(NULL);
   return 0;
+}
+void child_handler(int sig)
+{
+    child_done = 1;
+}
+
+void alarm_handler(int sig)
+{
+    is_timeout = 1;
 }
