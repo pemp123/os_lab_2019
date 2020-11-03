@@ -1,0 +1,2 @@
+export LD_LIBRARY_PATH=/projects/pemp123-os_lab_2019/lab4/src/:${LD_LIBRARY_PATH}
+./sum --seed 12 --array_size 12 --threads_num 2
