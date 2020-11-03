@@ -7,7 +7,7 @@ all: sum
 
 again: clean all
 
-utils2.o : /projects/cpp-hello-world/lab3/src/utils.h
+utils2.o : utils.h
 	$(CC) -o utils2.o -c $(UTPATH)utils.c $(CFLAGS)
 
 sum: libsum utils2.o utils.h sum_arr.h 
