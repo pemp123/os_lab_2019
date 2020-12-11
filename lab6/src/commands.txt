@@ -1,4 +1,4 @@
-export LD_LIBRARY_PATH=/projects/pemp-123-os_lab_2019/lab6/src/:${LD_LIBRARY_PATH} 
+export LD_LIBRARY_PATH=/projects/pemp123-os_lab_2019/lab6/src/:${LD_LIBRARY_PATH} 
 make 
-./start.sh 2 2 5 11 /projects/pemp-123-os_lab_2019/lab6/src/ips.md 
+./start.sh 2 2 5 11 /projects/pemp123-os_lab_2019/lab6/src/ips.md 
 pkill server
