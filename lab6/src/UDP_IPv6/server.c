@@ -107,7 +107,7 @@ int main(int argc, char **argv) {
     return 1;
   }
 
- printf("SERVER starts...\n");
+ printf("SERVER starts at %d\n",port);
 
 //   err = listen(server_fd, 128);
 //   if (err < 0) {
@@ -194,7 +194,7 @@ int main(int argc, char **argv) {
 
       char buffer[sizeof(total)];
       memcpy(buffer, &total, sizeof(total));
-      err = sendto(server_fd, from_client, buffer_size, 0, (struct sockaddr *)&client, len);
+      err = sendto(server_fd, buffer, buffer_size, 0, (struct sockaddr *)&client, len);
       if (err < 0) {
         fprintf(stderr, "Can't send data to client\n");
         break;
