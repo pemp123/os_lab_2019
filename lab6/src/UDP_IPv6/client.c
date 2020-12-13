@@ -153,12 +153,13 @@ int main(int argc, char **argv) {
       exit(1);
     }
 
-    struct sockaddr_in server;
-    server.sin_family = AF_INET;
-    server.sin_port = htons(to[i].port);
-    server.sin_addr.s_addr = *((unsigned long *)hostname->h_addr_list[0]);
+    struct sockaddr_in6 server;
+    server.sin6_family = AF_INET6;
+    server.sin6_port = htons(to[i].port);
+    //server.sin6_addr = *((unsigned long *)hostname->h_addr_list[0]);
+    inet_pton(AF_INET6, to[i].ip, server.sin6_addr);
 
-    sck[i] = socket(AF_INET,SOCK_DGRAM, 0);
+    sck[i] = socket(AF_INET6,SOCK_DGRAM, 0);
     if (sck < 0) {
       fprintf(stderr, "Socket creation failed!\n");
       exit(1);

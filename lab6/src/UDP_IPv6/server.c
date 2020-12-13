@@ -87,16 +87,16 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  int server_fd = socket(AF_INET,  SOCK_DGRAM, 0);
+  int server_fd = socket(AF_INET6,  SOCK_DGRAM, 0);
   if (server_fd < 0) {
     fprintf(stderr, "Can not create server socket!");
     return 1;
   }
 
-  struct sockaddr_in server;
-  server.sin_family = AF_INET;
-  server.sin_port = htons((uint16_t)port);
-  server.sin_addr.s_addr = htonl(INADDR_ANY);
+  struct sockaddr_in6 server;
+  server.sin6_family = AF_INET6;
+  server.sin6_port = htons((uint16_t)port);
+  server.sin6_addr = in6addr_any;
 
   int opt_val = 1;
   //setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt_val, sizeof(opt_val));
@@ -137,7 +137,7 @@ int main(int argc, char **argv) {
 //     }
 
     while (true) {
-        struct sockaddr_in client;
+        struct sockaddr_in6 client;
         socklen_t client_len = sizeof(client);
       unsigned int buffer_size = sizeof(uint64_t) * 3;
       char from_client[buffer_size];
