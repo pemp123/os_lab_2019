@@ -202,6 +202,7 @@ int main(int argc, char **argv) {
     char buff[sizeof(uint64_t)];
     pthread_join(threads[i], (void **)&response);
     answer = MultModulo(response, answer, mod);
+    printf("%llu\n",answer);
   }
 
   free(to);
