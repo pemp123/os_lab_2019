@@ -144,54 +144,57 @@ int main(int argc, char **argv) {
   int ars = k / servers_num;
   int left = k % servers_num;
   int sck[servers_num];
+  int n;
   pthread_t threads[servers_num];
   for (int i = 0; i < servers_num; i++) {
     struct hostent *hostname = gethostbyname(to[i].ip);
     if (hostname == NULL) {
       fprintf(stderr, "gethostbyname failed with %s\n", to[i].ip);
-     exit(1);
+      exit(1);
     }
 
-    struct sockaddr_in6 server;
-    server.sin6_family = AF_INET6;
-    server.sin6_port = htons(to[i].port);
-    inet_pton(AF_INET6, to[i].ip, &server.sin6_addr);
-    printf("%c",server.sin6_addr);
-    //server.sin6_addr = *((struct in6_addr *)hostname->h_addr_list[0]);
-    //  if (inet_pton(AF_INET6, to[i].ip, &server.sin6_addr) < 0) {
-    //      perror("inet_pton problem");
-    //      exit(1);
-    // }
-    sck[i] = socket(AF_INET6, SOCK_STREAM, 0);
+    struct sockaddr_in server;
+    server.sin_family = AF_INET;
+    server.sin_port = htons(to[i].port);
+    server.sin_addr.s_addr = *((unsigned long *)hostname->h_addr_list[0]);
+
+    sck[i] = socket(AF_INET,SOCK_DGRAM, 0);
     if (sck < 0) {
       fprintf(stderr, "Socket creation failed!\n");
       exit(1);
     }
 
-    if (connect(sck[i], (struct sockaddr *)&server, sizeof(server)) < 0) {
-      fprintf(stderr, "Connection failed\n");
-      exit(1);
-    }
+    // if (connect(sck[i], (struct sockaddr *)&server, sizeof(server)) < 0) {
+    //   fprintf(stderr, "Connection failed\n");
+    //   exit(1);
+    // }
 
     // parallel between servers
     uint64_t begin = ars * i + (left < i ? left : i) + 1;
     uint64_t end = ars * (i + 1) + (left < i + 1 ? left : i + 1) + 1;
-
-    char task[sizeof(uint64_t) * 3];
+    int BUFSIZE=sizeof(uint64_t) * 3;
+    char task[BUFSIZE];
     memcpy(task, &begin, sizeof(uint64_t));
     memcpy(task + sizeof(uint64_t), &end, sizeof(uint64_t));
     memcpy(task + 2 * sizeof(uint64_t), &mod, sizeof(uint64_t));
+//(server_fd, from_client, buffer_size, 0, (struct sockaddr *)&client, len)
 
-    if (send(sck[i], task, sizeof(task), 0) < 0) {
-      fprintf(stderr, "Send failed\n");
+    if (sendto(sck[i], task, sizeof(task), 0, (struct sockaddr *)&server, sizeof(server)) == -1) {
+      perror("sendto problem");
       exit(1);
     }
+
+    // if (sendto(sck[i], task, sizeof(task), 0) < 0) {
+    //   fprintf(stderr, "Send failed\n");
+    //   exit(1);
+    // }
     if (pthread_create(&threads[i], NULL, (void *)WaitForResponse,
                        (void *)&(sck[i]))) {
       printf("Error: pthread_create failed!\n");
       return 1;
     }
   }
+ 
 
   uint64_t answer = 1;
   uint64_t response = 0;
